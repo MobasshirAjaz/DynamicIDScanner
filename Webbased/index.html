@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamic ID Scanner</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="script.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+    <script
+      type="text/javascript"
+      src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.2/rollups/aes.js"
+    ></script>
+  </head>
+  <body>
+    <section class="camera">
+      <canvas id="frameCanvas" style="display: none"></canvas>
+      <video id="camerafeed" autoplay="true"></video>
+    </section>
+    <section class="details">
+      <div class="buttons">
+        <button id="entry" class="active">Entry gate</button>
+        <button id="exit" class="notactive">Exit gate</button>
+      </div>
+      <section class="userdetail">
+        <p>Name:</p>
+        <p>Roll:</p>
+        <p>Year:</p>
+      </section>
+      <div class="status">
+        <div class="colorcode"></div>
+        <p class="statustext">Stop</p>
+      </div>
+    </section>
+  </body>
+</html>
