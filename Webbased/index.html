@@ -6,12 +6,35 @@
     <title>Dynamic ID Scanner</title>
     <link rel="stylesheet" href="style.css" />
     <script src="script.js" defer></script>
+    <!--For Qr code-->
     <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+    <!-------------------------------------------------------------------------------------------------->
+
+    <!--For barcode(quagga)-->
     <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+    <!-------------------------------------------------------------------------------------------------->
+
+    <!--For barcode(barcodeDetector polyfill)-->
+    <script src="https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.9.15/dist/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.js"></script>
+    <script>
+      try {
+        window["BarcodeDetector"].getSupportedFormats();
+      } catch {
+        window["BarcodeDetector"] =
+          barcodeDetectorPolyfill.BarcodeDetectorPolyfill;
+      }
+    </script>
+    <!-------------------------------------------------------------------------------------------------->
+
+    <!--For decryption(cryptojs)-->
     <script
       type="text/javascript"
       src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.2/rollups/aes.js"
     ></script>
+    <!-------------------------------------------------------------------------------------------------->
+
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
   </head>
   <body>
     <section class="camera">
@@ -24,9 +47,9 @@
         <button id="exit" class="notactive">Exit gate</button>
       </div>
       <section class="userdetail">
-        <p>Name:</p>
-        <p>Roll:</p>
-        <p>Year:</p>
+        <p id="name">Name:</p>
+        <p id="roll">Roll:</p>
+        <p id="year">Year:</p>
       </section>
       <div class="status">
         <div class="colorcode"></div>

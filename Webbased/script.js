@@ -2,6 +2,84 @@ const video = document.getElementById("camerafeed");
 const canvas = document.getElementById("frameCanvas");
 const context = canvas.getContext("2d");
 
+const colorcode = document.getElementsByClassName("colorcode")[0];
+const statustext = document.getElementsByClassName("statustext")[0];
+
+colorcode.style.background = "yellow";
+statustext.innerText = "Scan";
+
+const usrname = document.getElementById("name");
+const roll = document.getElementById("roll");
+const year = document.getElementById("year");
+
+let active = "entry";
+
+let time = new Date();
+
+function setstatus(data) {
+  if (data.status === "dont_allow") {
+    colorcode.style.background = "red";
+    statustext.innerText = "Stop";
+  } else if (data.status === "invalid") {
+    colorcode.style.background = "red";
+    statustext.innerText = "INVALID";
+  } else if (data.status === "allow") {
+    colorcode.style.background = "green";
+    statustext.innerText = "GO";
+    setTimeout(() => {
+      colorcode.style.background = "yellow";
+      statustext.innerText = "Scan";
+    }, 2000);
+  }
+}
+function validateQR(roll) {
+  if (active === "entry") {
+    console.log("entered");
+    fetch("http://localhost:3000/entry", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ roll: roll }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        console.log("Entry Success:", data);
+        setstatus(data);
+        extractFrame();
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+      });
+  } else {
+    fetch("http://localhost:3000/exit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ roll: roll }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        console.log("Exit Success:", data);
+        setstatus(data);
+        extractFrame();
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+      });
+  }
+}
+function updatedetails(decryptedStr) {
+  const [nm, rl, yr] = decryptedStr.split("#");
+  console.log(nm);
+
+  usrname.innerText = "Name: " + nm;
+  roll.innerText = "Roll: " + rl;
+  year.innerText = "Year: " + yr;
+
+  validateQR(rl);
+}
 function decodeQR(qrcontent) {
   try {
     qrcontent = qrcontent.toString();
@@ -17,8 +95,32 @@ function decodeQR(qrcontent) {
 
     const decryptedStr = decrypted.toString(CryptoJS.enc.Utf8);
     console.log(decryptedStr);
+    updatedetails(decryptedStr);
   } catch (err) {
-    console.log("Invalid QR code");
+    console.log(err);
+    console.log("Invalid QR");
+    colorcode.style.background = "red";
+    statustext.innerText = "INVALID";
+  }
+}
+
+let lastbarcodes = [];
+
+function arraysAreEqual(arr1, arr2) {
+  // if (arr1.length !== arr2.length) return false;
+  // return arr1.every((obj1, index) => {
+  //   const obj2 = arr2[index];
+
+  //   return obj1.rawValue === obj2.rawValue && obj1.format === obj2.format;
+  // });
+
+  return _.isEqual(arr1[0], arr2[0]);
+}
+
+function decodeBarcode(barcodes) {
+  if (!arraysAreEqual(barcodes, lastbarcodes)) {
+    console.log(barcodes); // Logs only when contents change
+    lastbarcodes = [...barcodes]; // Update last known barcodes
   }
 }
 
@@ -30,28 +132,24 @@ function scanQR(imageData) {
     if (qrcontent !== lastQRContent) {
       console.log("QR content changed: ", qrcontent);
       lastQRContent = qrcontent;
+      setTimeout(() => {
+        lastQRContent = "";
+      }, 3500); //to allow successive same qr scans but not to get infinite decoding.
       decodeQR(qrcontent);
     }
   }
 }
 
-function barcodeScan(imageData) {
-  if (!("BarcodeDetector" in globalThis)) {
-    console.log("Barcode Detector is not supported by this browser.");
-  } else {
-    console.log("Barcode Detector supported!");
-  }
-  const barcodeDetector = new BarcodeDetector({
-    formats: ["code_39", "codabar", "ean_13"],
-  });
-  barcodeDetector
-    .detect(imageData)
-    .then((barcodes) => {
-      barcodes.forEach((barcode) => console.log(barcode.rawValue));
-    })
-    .catch((err) => {
-      console.log(err);
+async function barcodeScan(imageData) {
+  try {
+    const detector = new BarcodeDetector({
+      formats: ["code_39", "code_128", "ean_13"],
     });
+    const barcodes = await detector.detect(imageData);
+    return barcodes;
+  } catch (err) {
+    console.log(err);
+  }
 }
 function scanBarcode() {
   Quagga.init(
@@ -93,7 +191,7 @@ if (video && navigator.mediaDevices.getUserMedia) {
     .getUserMedia({ video: true })
     .then(function (stream) {
       video.srcObject = stream;
-      scanBarcode();
+      //scanBarcode();
     })
     .catch(function (error) {
       console.log("Something went wrong!: ", error);
@@ -111,7 +209,13 @@ function extractFrame() {
   const frameurl = canvas.toDataURL();
 
   scanQR(framedata);
-  //barcodeScan(framedata);
+  barcodeScan(framedata)
+    .then((barcodes) => {
+      decodeBarcode(barcodes);
+    })
+    .catch((error) => {
+      console.error("Barcode detection failed:", error);
+    });
 
   setTimeout(requestAnimationFrame(extractFrame), 100);
 }
@@ -119,18 +223,25 @@ function extractFrame() {
 const entrybutton = document.getElementById("entry");
 const exitbutton = document.getElementById("exit");
 
-active = "entry";
-
 entrybutton.addEventListener("click", () => {
   entrybutton.className = "active";
   exitbutton.className = "notactive";
   active = "entry";
+  lastQRContent = "";
+  lastbarcodes = [];
+
+  colorcode.style.background = "yellow";
+  statustext.innerText = "Scan";
 });
 
 exitbutton.addEventListener("click", () => {
   entrybutton.className = "notactive";
   exitbutton.className = "active";
   active = "exit";
+  lastQRContent = "";
+  lastbarcodes = [];
+  colorcode.style.background = "yellow";
+  statustext.innerText = "Scan";
 });
 
 video.addEventListener("loadedmetadata", () => {
