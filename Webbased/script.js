@@ -1,3 +1,5 @@
+//import { caesarcipher, decryptQR } from "../../DynamicIDServer/encrypt";
+
 const video = document.getElementById("camerafeed");
 const canvas = document.getElementById("frameCanvas");
 const context = canvas.getContext("2d");
@@ -82,19 +84,8 @@ function updatedetails(decryptedStr) {
 }
 function decodeQR(qrcontent) {
   try {
-    qrcontent = qrcontent.toString();
-    const [hexIv, hexCiphertext] = qrcontent.split("#");
+    decryptedStr = decryptQR(qrcontent);
 
-    const iv = CryptoJS.enc.Hex.parse(hexIv);
-    const ciphertext = CryptoJS.enc.Hex.parse(hexCiphertext);
-
-    const key = CryptoJS.enc.Utf8.parse("mysecretaeskey16");
-    const decrypted = CryptoJS.AES.decrypt({ ciphertext: ciphertext }, key, {
-      iv: iv,
-    });
-
-    const decryptedStr = decrypted.toString(CryptoJS.enc.Utf8);
-    console.log(decryptedStr);
     updatedetails(decryptedStr);
   } catch (err) {
     console.log(err);
@@ -104,23 +95,36 @@ function decodeQR(qrcontent) {
   }
 }
 
-let lastbarcodes = [];
+function validateBarcode(decryptedbarcode) {
+  const regex = /^\d{2}:\d{2}:\d{2}$/;
+  if (regex.test(decryptedbarcode)) {
+    const currentTime = new Date(); // Get the current time
+    const currentTimeInSeconds =
+      currentTime.getHours() * 3600 +
+      currentTime.getMinutes() * 60 +
+      currentTime.getSeconds(); // Convert current time to seconds
 
-function arraysAreEqual(arr1, arr2) {
-  // if (arr1.length !== arr2.length) return false;
-  // return arr1.every((obj1, index) => {
-  //   const obj2 = arr2[index];
+    // Parse the input time string (in hh:mm:ss format)
+    const [hours, minutes, seconds] = decryptedbarcode.split(":").map(Number);
+    const inputTimeInSeconds = hours * 3600 + minutes * 60 + seconds;
 
-  //   return obj1.rawValue === obj2.rawValue && obj1.format === obj2.format;
-  // });
+    // Calculate the time difference and check if it's within ±3 seconds
+    const difference = Math.abs(currentTimeInSeconds - inputTimeInSeconds);
 
-  return _.isEqual(arr1[0], arr2[0]);
+    if (difference <= 300) console.log("Barcode valid");
+    else console.log("Barcode invalid");
+  }
 }
+function decodeBarcode(barcodecontent) {
+  try {
+    barcodecontent = barcodecontent[0].rawValue.toString();
+    console.log(barcodecontent);
 
-function decodeBarcode(barcodes) {
-  if (!arraysAreEqual(barcodes, lastbarcodes)) {
-    console.log(barcodes); // Logs only when contents change
-    lastbarcodes = [...barcodes]; // Update last known barcodes
+    let decryptedbarcode = caesarcipher(barcodecontent, -5);
+    console.log(decryptedbarcode);
+    validateBarcode(decryptedbarcode);
+  } catch (err) {
+    console.log("barcode detection error.");
   }
 }
 
@@ -151,40 +155,6 @@ async function barcodeScan(imageData) {
     console.log(err);
   }
 }
-function scanBarcode() {
-  Quagga.init(
-    {
-      inputStream: {
-        type: "LiveStream",
-        target: video,
-        constraints: {
-          facingMode: "environment",
-          width: 640,
-          height: 480,
-        },
-      },
-      decoder: {
-        readers: ["code_128_reader"],
-      },
-      locate: true,
-      src: video,
-    },
-    function (err) {
-      if (err) {
-        console.log("Quagga initialization failed: ", err);
-        return;
-      }
-      console.log("Quagga initialized successfully!");
-      Quagga.start();
-    }
-  );
-
-  Quagga.onDetected(function (result) {
-    if (result && result.codeResult) {
-      console.log("Barcode detected: ", result.codeResult.code);
-    }
-  });
-}
 
 if (video && navigator.mediaDevices.getUserMedia) {
   navigator.mediaDevices
@@ -200,6 +170,7 @@ if (video && navigator.mediaDevices.getUserMedia) {
   console.log("video error");
 }
 
+let lastbarcodes = [];
 function extractFrame() {
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
@@ -211,7 +182,10 @@ function extractFrame() {
   scanQR(framedata);
   barcodeScan(framedata)
     .then((barcodes) => {
-      decodeBarcode(barcodes);
+      if (JSON.stringify(barcodes[0]) !== JSON.stringify(lastbarcodes[0])) {
+        decodeBarcode(barcodes);
+        lastbarcodes = [...barcodes];
+      }
     })
     .catch((error) => {
       console.error("Barcode detection failed:", error);
@@ -228,7 +202,6 @@ entrybutton.addEventListener("click", () => {
   exitbutton.className = "notactive";
   active = "entry";
   lastQRContent = "";
-  lastbarcodes = [];
 
   colorcode.style.background = "yellow";
   statustext.innerText = "Scan";
@@ -239,7 +212,7 @@ exitbutton.addEventListener("click", () => {
   exitbutton.className = "active";
   active = "exit";
   lastQRContent = "";
-  lastbarcodes = [];
+
   colorcode.style.background = "yellow";
   statustext.innerText = "Scan";
 });
